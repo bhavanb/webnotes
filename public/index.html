@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="assets/helper.js"></script>
+    <script src="./script.js"></script>
+    <link rel="icon" type="image/x-icon" href="assets/icon-note.svg">
+    <link rel="stylesheet" href="./styles.css">
+    <title>WebNotes</title>
+</head>
+
+<body>
+    <div id="loader">
+        <img id="loadIcon" src="assets/icon-note.svg" alt="noteIcon" draggable="false">
+    </div>
+
+    <div id="all" style="opacity: 0;">
+        <div id="sidebar" class="inverse">
+            <div id="contentList" class="list inverse"></div>
+            <div id="optionList" class="list inverse"></div>
+        </div>
+        <div id="main">
+            <div id="splashScreen">
+                <div id="splashContent">
+                    <img id="splashIcon" src="assets/icon-note.svg" alt="splashIcon" draggable="false">
+                    <p id="splashText">Use the sidebar to open a note, or create a new one.</p>
+                </div>
+            </div>
+            <div id="content" class="hidden">
+                <input id="heading" class="editable" oninput="update()" placeholder="Enter a Title..."></input>
+                <div id="editor" class="editable" contenteditable oninput="update()" placeholder="Type something...">
+                </div>
+            </div>
+        </div>
+        <div id="footer" class="footer inverse">
+            <img id="menu" class="element inverse icon" onclick="toggleSidebar()" src="assets/icon-menu.svg" alt="menu"
+                draggable="false">
+            <p id="wordcount" class="element inverse"></p>
+            <p id="statusIndicator" class="element inverse dull"></p>
+            <img id="themeSelector" class="element inverse icon" onclick="toggleTheme()" src="assets/icon-light.svg"
+                alt="themeSelector" draggable="false">
+        </div>
+    </div>
+</body>
+<!-- Icons from www.svgrepo.com -->
+
+</html>
