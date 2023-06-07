@@ -12,7 +12,12 @@ window.onload = async function () {
         selection.addRange(range);
         editor.scrollTop = editor.scrollHeight;
     }
-
+    var note = window.location.pathname;
+    if (note) {
+        note = '.' + note.substring(0, note.length - 1);
+        console.log(note);
+        getNote(note);
+    }
     await document.fonts.load("16px Inter").then(function () { hideLoader() }, function () { console.log("error loading fonts"); });
 }
 
@@ -164,7 +169,7 @@ function getContentList(path = "") {
     }).then(response => response.json()).then((json) => {
         setContentList(json["path"], json["data"]);
         getSetTheme();
-        sessionStorage.setItem("path", (path) ? path : "./docs/");
+        sessionStorage.setItem("path", (path) ? path : "./notes/");
     });
 }
 
@@ -173,7 +178,7 @@ function setContentList(path, notes) {
     contentList.querySelectorAll(".note").forEach((elem) => {
         elem.remove();
     });
-    if (path != "./docs/") {
+    if (path != "./notes/") {
         var parentFolder = path;
         split = parentFolder.split('/');
         split = (split[split.length - 1] == '') ? split.slice(0, -1) : split;
@@ -192,7 +197,7 @@ function setContentList(path, notes) {
         backButton.appendChild(backText);
 
         var dirText = document.createElement("p");
-        dirText.innerText = parentFolder.replace("./docs", "home");
+        dirText.innerText = parentFolder.replace("./notes", "home");
         dirText.classList.add("inverse");
         dirText.style.display = "none";
         dirText.setAttribute("text", "");
@@ -283,6 +288,7 @@ function setContentList(path, notes) {
 
         entry.onclick = function () {
             if (!window.getSelection().toString()) {
+                console.log(elem.name);
                 (`${elem.type}` === "note") ? getNote(`${elem.name}`) : getFolder(`${elem.name}`);
             }
         };
@@ -407,10 +413,20 @@ function getNote(note) {
         headers: {
             "Content-type": "application/json; charset=UTF-8"
         }
-    }).then(response => response.json()).then(json => openNote(formatContent(json)));
+    }).then(response => response.json()).then(json => {
+        if (json["data"] != "error") {
+            openNote(formatContent(json))
+        }
+        else {
+            document.getElementById("statusIndicator").innerText = "Error! Could not get " + note;
+            setTimeout(() => { document.getElementById("statusIndicator").classList.add("hidden"); }, 1000);
+            console.error("Error! Could not get " + note);
+        }
+    });
 }
 
 function openNote(json) {
+    console.log(json);
     sessionStorage.setItem("note-cache", JSON.stringify({
         name: json["name"].split('/')[json["name"].split('/').length - 1],
         data: json["data"],

@@ -11,6 +11,7 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 
 app.use(express.static("public"));
+app.use('/notes/:name', express.static("public"));
 
 app.listen(PORT, (error) => {
     if (!error) {
@@ -68,7 +69,7 @@ app.post('/interface', (req, res) => {
 });
 
 function readListofContents(res, path = "") {
-    var readdir = path || "./docs/";
+    var readdir = path || "./notes/";
     readdir = readdir.replace(/\/+/g, "/");
     fs.readdir(readdir, (err, files) => {
         if (!err) {
@@ -116,7 +117,7 @@ function readNote(res, name) {
 }
 
 function createNote(res, path, name) {
-    fs.writeFile(path+name, "", (err) => {
+    fs.writeFile(path + name, "", (err) => {
         if (!err) {
             console.log("- Created", path);
             res.send(JSON.stringify({
@@ -177,7 +178,7 @@ function deleteNote(res, name) {
 }
 
 function createFolder(res, path, name) {
-    fs.mkdir(path+name, (err) => {
+    fs.mkdir(path + name, (err) => {
         if (!err) {
             console.log("- Created Folder", path);
             res.send(JSON.stringify({
