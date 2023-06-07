@@ -11,7 +11,6 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 
 app.use(express.static("public"));
-app.use('/notes/:name', express.static("public"));
 
 app.listen(PORT, (error) => {
     if (!error) {
@@ -22,7 +21,7 @@ app.listen(PORT, (error) => {
     }
 });
 
-app.post('/interface', (req, res) => {
+app.post('/interface/', (req, res) => {
     let data = req.body;
 
     switch (data["title"]) {
@@ -99,21 +98,13 @@ function readListofContents(res, path = "") {
 }
 
 function readNote(res, name) {
-    fs.readFile(name, (err, file) => {
-        if (!err) {
-            console.log("- Read", name);
-            res.send(JSON.stringify({
-                name: name,
-                data: file.toString()
-            }));
-        }
-        else {
-            console.error(err);
-            res.send(JSON.stringify({
-                data: "error"
-            }));
-        }
+    const src = fs.createReadStream(name);
+    src.on("error", function (err) {
+        console.error(err);
+        res.status(404);
     });
+    console.log("- Read", name);
+    src.pipe(res);
 }
 
 function createNote(res, path, name) {
@@ -147,15 +138,11 @@ function updateNote(res, data) {
     fs.writeFile(path, data["data"], function (err) {
         if (!err) {
             console.log("- Updated as", path);
-            res.send(JSON.stringify({
-                data: "success"
-            }));
+            res.status(200);
         }
         else {
             console.error(err);
-            res.send(JSON.stringify({
-                data: "error"
-            }));
+            res.status(500)
         }
     });
 }

@@ -139,8 +139,8 @@ function fixFormat(text) {
 	return t;
 }
 
-function formatContent(json) {
-	var text = json["data"];
+function formatContent(text) {
+	var text = text;
 
 	//BOLD
 	var rBSpan = /\*.*?\*/g;
@@ -177,8 +177,8 @@ function formatContent(json) {
 	}
 
 	text = replaceAll(text, "\n", "<br>");
-	json["data"] = text;
-	return json;
+	text["data"] = text;
+	return text;
 }
 
 function deformatContent(json) {
@@ -199,3 +199,13 @@ function deformatContent(json) {
 	return json;
 
 }
+
+function modifyUrl(title, url) {
+	if (typeof (history.pushState) != "undefined") {
+	 var obj = {
+	  Title: title,
+	  Url: url
+	 };
+	 history.pushState(obj, obj.Title, obj.Url);
+	}
+   }

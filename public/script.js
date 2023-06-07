@@ -12,10 +12,10 @@ window.onload = async function () {
         selection.addRange(range);
         editor.scrollTop = editor.scrollHeight;
     }
-    var note = window.location.pathname;
-    if (note) {
-        note = '.' + note.substring(0, note.length - 1);
-        console.log(note);
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const note = urlParams.get('note');
+    if (note != null) {
         getNote(note);
     }
     await document.fonts.load("16px Inter").then(function () { hideLoader() }, function () { console.log("error loading fonts"); });
@@ -150,7 +150,7 @@ function sidebarIsOpen() {
 }
 
 function getContentList(path = "") {
-    fetch("http://localhost:3000/interface", {
+    fetch("http://localhost:3000/interface/", {
 
         // Adding method type
         method: "POST",
@@ -288,8 +288,13 @@ function setContentList(path, notes) {
 
         entry.onclick = function () {
             if (!window.getSelection().toString()) {
-                console.log(elem.name);
-                (`${elem.type}` === "note") ? getNote(`${elem.name}`) : getFolder(`${elem.name}`);
+                if (`${elem.type}` === "note") {
+                    getNote(`${elem.name}`)
+                    modifyUrl("Webnotes | " + name, "?note=" + elem.name.substring(2, elem.name.length));
+                }
+                else {
+                    getFolder(`${elem.name}`);
+                }
             }
         };
         entry.classList = document.body.classList;
@@ -363,7 +368,7 @@ async function createNote() {
     if (!name) { return; }
     var path = sessionStorage.getItem("path");
     path += (path[path.length - 1] == '/') ? '' : '/';
-    fetch("http://localhost:3000/interface", {
+    fetch("http://localhost:3000/interface/", {
 
         // Adding method type
         method: "POST",
@@ -397,7 +402,7 @@ async function createNote() {
 }
 
 function getNote(note) {
-    fetch("http://localhost:3000/interface", {
+    fetch("http://localhost:3000/interface/", {
 
         // Adding method type
         method: "POST",
@@ -413,9 +418,11 @@ function getNote(note) {
         headers: {
             "Content-type": "application/json; charset=UTF-8"
         }
-    }).then(response => response.json()).then(json => {
-        if (json["data"] != "error") {
-            openNote(formatContent(json))
+    }).then(res => {
+        if (res.status == 200) {
+            res.text().then(text => {
+                openNote(note, formatContent(text));
+            });
         }
         else {
             document.getElementById("statusIndicator").innerText = "Error! Could not get " + note;
@@ -425,17 +432,16 @@ function getNote(note) {
     });
 }
 
-function openNote(json) {
-    console.log(json);
+function openNote(name, data) {
     sessionStorage.setItem("note-cache", JSON.stringify({
-        name: json["name"].split('/')[json["name"].split('/').length - 1],
-        data: json["data"],
-        path: json["name"].replace(json["name"].split('/')[json["name"].split('/').length - 1], "")
+        name: name.split('/')[name.split('/').length - 1],
+        data: data,
+        path: name.replace(name.split('/')[name.split('/').length - 1], "")
     }));
     var heading = document.getElementById("heading");
     var editor = document.getElementById("editor");
-    heading.value = json["name"].split('/')[json["name"].split('/').length - 1];
-    editor.innerHTML = json["data"];
+    heading.value = name.split('/')[name.split('/').length - 1];
+    editor.innerHTML = data;
     if (document.getElementById("splashScreen")) {
         hideSplashscreen();
     }
@@ -448,7 +454,7 @@ function updateNote(json) {
     document.getElementById("statusIndicator").classList.remove("hidden");
     document.getElementById("statusIndicator").innerText = "Saving...";
     var noteData = json;
-    fetch("http://localhost:3000/interface", {
+    fetch("http://localhost:3000/interface/", {
 
         // Adding method type
         method: "POST",
@@ -465,8 +471,8 @@ function updateNote(json) {
         headers: {
             "Content-type": "application/json; charset=UTF-8"
         }
-    }).then(response => response.json()).then(json => {
-        if (json["data"] === "success") {
+    }).then(res => {
+        if (res.status == 200) {
             document.getElementById("statusIndicator").innerText = "Saved";
             setTimeout(() => { document.getElementById("statusIndicator").classList.add("hidden"); }, 1000);
             console.log("updated note successfully");
@@ -481,7 +487,7 @@ function updateNote(json) {
 
 async function deleteNote(name) {
     if (!await confirm("Are you sure you want to delete '" + name + "'? This cannot be undone!")) { return; }
-    fetch("http://localhost:3000/interface", {
+    fetch("http://localhost:3000/interface/", {
 
         // Adding method type
         method: "POST",
@@ -497,8 +503,8 @@ async function deleteNote(name) {
         headers: {
             "Content-type": "application/json; charset=UTF-8"
         }
-    }).then(response => response.json()).then((json) => {
-        if (json["data"] === "success") {
+    }).then(res => {
+        if (res.status == 200) {
             document.getElementById("statusIndicator").innerText = "Deleted note";
             setTimeout(() => { document.getElementById("statusIndicator").classList.add("hidden"); }, 1000);
             console.log("deleted note successfully");
@@ -519,7 +525,7 @@ async function createFolder() {
     if (!name) { return; }
     var path = sessionStorage.getItem("path");
     path += (path[path.length - 1] == '/') ? '' : '/';
-    fetch("http://localhost:3000/interface", {
+    fetch("http://localhost:3000/interface/", {
 
         // Adding method type
         method: "POST",
@@ -536,8 +542,8 @@ async function createFolder() {
         headers: {
             "Content-type": "application/json; charset=UTF-8"
         }
-    }).then(response => response.json()).then((json) => {
-        if (json["data"] === "success") {
+    }).then(res => {
+        if (res.status == 200) {
             document.getElementById("statusIndicator").innerText = "Created folder";
             setTimeout(() => { document.getElementById("statusIndicator").classList.add("hidden"); }, 1000);
             console.log("created folder successfully");
@@ -558,7 +564,7 @@ function getFolder(path) {
 
 async function deleteFolder(name) {
     if (!await confirm("Are you sure you want to delete '" + name + "'? This cannot be undone! Notes inside '" + name + "' will also be deleted!")) { return; }
-    fetch("http://localhost:3000/interface", {
+    fetch("http://localhost:3000/interface/", {
 
         // Adding method type
         method: "POST",
@@ -574,8 +580,8 @@ async function deleteFolder(name) {
         headers: {
             "Content-type": "application/json; charset=UTF-8"
         }
-    }).then(response => response.json()).then((json) => {
-        if (json["data"] === "success") {
+    }).then(res => {
+        if (res.status == 200) {
             document.getElementById("statusIndicator").innerText = "Deleted folder";
             setTimeout(() => { document.getElementById("statusIndicator").classList.add("hidden"); }, 1000);
             console.log("deleted folder successfully");
