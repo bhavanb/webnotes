@@ -127,7 +127,7 @@ function fixFormat(text) {
 			elem.replaceChild(document.createTextNode(div.innerHTML), div);
 		}
 		else {
-			elem.replaceChild(document.createTextNode("<br>"+div.innerHTML), div);
+			elem.replaceChild(document.createTextNode("<br>" + div.innerHTML), div);
 		}
 		div = elem.querySelector("div");
 	}
@@ -202,10 +202,22 @@ function deformatContent(json) {
 
 function modifyUrl(title, url) {
 	if (typeof (history.pushState) != "undefined") {
-	 var obj = {
-	  Title: title,
-	  Url: url
-	 };
-	 history.pushState(obj, obj.Title, obj.Url);
+		var obj = {
+			Title: title,
+			Url: url
+		};
+		history.pushState(obj, obj.Title, obj.Url);
 	}
-   }
+}
+
+String.prototype.hashCode = function () {
+	var hash = 0,
+		i, chr;
+	if (this.length === 0) return hash;
+	for (i = 0; i < this.length; i++) {
+		chr = this.charCodeAt(i);
+		hash = ((hash << 5) - hash) + chr;
+		hash |= 0;
+	}
+	return hash;
+}

@@ -435,7 +435,7 @@ function getNote(note) {
 function openNote(name, data) {
     sessionStorage.setItem("note-cache", JSON.stringify({
         name: name.split('/')[name.split('/').length - 1],
-        data: data,
+        data_hash: data.hashCode(),
         path: name.replace(name.split('/')[name.split('/').length - 1], "")
     }));
     var heading = document.getElementById("heading");
@@ -621,21 +621,26 @@ function autoSave() {
     var heading = document.getElementById("heading").value;
     var text = document.getElementById("editor").innerHTML;
     text = fixFormat(text);
-
+    console.log(text, text.hashCode());
     var cache_note = JSON.parse(sessionStorage.getItem("note-cache"));
-    if (cache_note["name"] != heading || cache_note["data"] != text) {
+    if (cache_note["name"] != heading || cache_note["data_hash"] != text.hashCode()) {
+        var cache_json = JSON.stringify({
+            name: heading,
+            data_hash: text.hashCode(),
+            path: cache_note["path"]
+        });
+        sessionStorage.setItem("note-cache", cache_json);
+
         var json = JSON.stringify({
             name_old: cache_note["name"],
             name: heading,
             data: text,
             path: cache_note["path"]
         });
-        sessionStorage.setItem("note-cache", json);
-
         json = JSON.parse(json);
 
         json["data"] = fixFormat(json["data"]);
-        document.getElementById("editor").innerHTML = text;
+        document.getElementById("editor").innerHTML = text; //FIXME: cursor jumping to start of note.
         updateNote(deformatContent(json));
         getContentList(cache_note["path"]);
     }
