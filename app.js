@@ -90,9 +90,7 @@ function readListofContents(res, path = "") {
         }
         else {
             console.error(err);
-            res.send(JSON.stringify({
-                data: "error occured while reading files"
-            }));
+            res.status(500).send();
         }
     });
 }
@@ -111,15 +109,11 @@ function createNote(res, path, name) {
     fs.writeFile(path + name, "", (err) => {
         if (!err) {
             console.log("- Created", path);
-            res.send(JSON.stringify({
-                data: "success"
-            }));
+            res.status(200).send();
         }
         else {
             console.error(err);
-            res.send(JSON.stringify({
-                data: "error"
-            }));
+            res.status(500).send();
         }
     });
 }
@@ -138,11 +132,11 @@ function updateNote(res, data) {
     fs.writeFile(path, data["data"], function (err) {
         if (!err) {
             console.log("- Updated as", path);
-            res.status(200);
+            res.status(200).send();
         }
         else {
             console.error(err);
-            res.status(500)
+            res.status(500).send()
         }
     });
 }
@@ -151,15 +145,11 @@ function deleteNote(res, name) {
     fs.unlink(name, function (err) {
         if (!err) {
             console.log("- Deleted", name);
-            res.send(JSON.stringify({
-                data: "success"
-            }));
+            res.status(200).send();
         }
         else {
             console.error(err);
-            res.send(JSON.stringify({
-                data: "error"
-            }));
+            res.status(500).send();
         }
     });
 }
