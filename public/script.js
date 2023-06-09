@@ -640,7 +640,7 @@ function autoSave() {
         json = JSON.parse(json);
 
         json["data"] = fixFormat(json["data"]);
-        document.getElementById("editor").innerHTML = text; //FIXME: cursor jumping to start of note.
+        document.getElementById("editor").setContent(text);
         updateNote(deformatContent(json));
         getContentList(cache_note["path"]);
     }

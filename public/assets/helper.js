@@ -221,3 +221,66 @@ String.prototype.hashCode = function () {
 	}
 	return hash;
 }
+
+HTMLDivElement.prototype.setContent =
+	function (content) {
+		var range = window.getSelection().getRangeAt(0);
+		var end_node = range.endContainer;
+		var end = range.endOffset;
+		if (end_node != this) {
+			var text_nodes = get_text_nodes_in(this);
+			for (var i = 0; i < text_nodes.length; ++i) {
+				if (text_nodes[i] == end_node) {
+					break;
+				}
+				end += text_nodes[i].length;
+			}
+		}
+		var html = this.innerHTML;
+		if (/\&nbsp;$/.test(html) && this.innerText.length == end) {
+			end = end - 1;
+			set_range(end, end, this);
+			return;
+		}
+		this.innerHTML = content;
+		set_range(end, end, this);
+	}
+
+function get_text_nodes_in(node) {
+	var text_nodes = [];
+	if (node.nodeType === 3) {
+		text_nodes.push(node);
+	} else {
+		var children = node.childNodes;
+		for (var i = 0, len = children.length; i < len; ++i) {
+			text_nodes.push.apply(text_nodes, get_text_nodes_in(children[i]));
+		}
+	}
+	return text_nodes;
+}
+
+function set_range(start, end, element) {
+	var range = document.createRange();
+	range.selectNodeContents(element);
+	var text_nodes = get_text_nodes_in(element);
+	var foundStart = false;
+	var char_count = 0, end_char_count;
+
+	for (var i = 0, text_node; text_node = text_nodes[i++];) {
+		end_char_count = char_count + text_node.length;
+		if (!foundStart && start >= char_count && (start < end_char_count || (start === end_char_count && i < text_nodes.length))) {
+			range.setStart(text_node, start - char_count);
+			foundStart = true;
+		}
+		if (foundStart && end <= end_char_count) {
+			range.setEnd(text_node, end - char_count);
+			break;
+		}
+		char_count = end_char_count;
+	}
+
+	var selection = window.getSelection();
+	selection.removeAllRanges();
+	selection.addRange(range);
+	selection.collapseToEnd();
+}
