@@ -289,8 +289,7 @@ function setContentList(path, notes) {
         entry.onclick = function () {
             if (!window.getSelection().toString()) {
                 if (`${elem.type}` === "note") {
-                    getNote(`${elem.name}`)
-                    modifyUrl("Webnotes | " + name, "?note=" + elem.name.substring(2, elem.name.length));
+                    getNote(`${elem.name}`);
                 }
                 else {
                     getFolder(`${elem.name}`);
@@ -385,8 +384,8 @@ async function createNote() {
         headers: {
             "Content-type": "application/json; charset=UTF-8"
         }
-    }).then(response => response.json()).then((json) => {
-        if (json["data"] === "success") {
+    }).then(res => {
+        if (res.status == 200) {
             document.getElementById("statusIndicator").innerText = "Created " + name;
             setTimeout(() => { document.getElementById("statusIndicator").classList.add("hidden"); }, 1000);
             console.log("created " + name + " successfully");
@@ -433,6 +432,7 @@ function getNote(note) {
 }
 
 function openNote(name, data) {
+    modifyUrl("Webnotes | " + name.split('/')[name.split('/').length - 1], "?note=" + name.replace("./", ""));
     sessionStorage.setItem("note-cache", JSON.stringify({
         name: name.split('/')[name.split('/').length - 1],
         data_hash: data.hashCode(),
@@ -451,38 +451,44 @@ function openNote(name, data) {
 }
 
 function updateNote(json) {
+    var maxPayload = 65536;
     document.getElementById("statusIndicator").classList.remove("hidden");
     document.getElementById("statusIndicator").innerText = "Saving...";
-    var noteData = json;
-    fetch("http://localhost:3000/interface/", {
+    if (json["data"].toByteArray().length <= maxPayload) {
+        fetch("http://localhost:3000/interface/", {
 
-        // Adding method type
-        method: "POST",
+            // Adding method type
+            method: "POST",
 
-        // Adding body or contents to send
-        body: JSON.stringify({
-            title: "update",
-            name_old: noteData["path"] + noteData["name_old"],
-            name: noteData["path"] + noteData["name"],
-            data: noteData["data"]
-        }),
+            // Adding body or contents to send
+            body: JSON.stringify({
+                title: "update",
+                name_old: json["path"] + json["name_old"],
+                name: json["path"] + json["name"],
+                data: json["data"],
+                isLastChunk: true
+            }),
 
-        // Adding headers to the request
-        headers: {
-            "Content-type": "application/json; charset=UTF-8"
-        }
-    }).then(res => {
-        if (res.status == 200) {
-            document.getElementById("statusIndicator").innerText = "Saved";
-            setTimeout(() => { document.getElementById("statusIndicator").classList.add("hidden"); }, 1000);
-            console.log("updated note successfully");
-        }
-        else {
-            document.getElementById("statusIndicator").innerText = "Error! Could not save note";
-            setTimeout(() => { document.getElementById("statusIndicator").classList.add("hidden"); }, 1000);
-            console.error("could not update note!");
-        }
-    });
+            // Adding headers to the request
+            headers: {
+                "Content-type": "application/json; charset=UTF-8"
+            }
+        }).then(res => {
+            if (res.status == 200) {
+                document.getElementById("statusIndicator").innerText = "Saved";
+                setTimeout(() => { document.getElementById("statusIndicator").classList.add("hidden"); }, 1000);
+                console.log("updated note successfully");
+            }
+            else {
+                document.getElementById("statusIndicator").innerText = "Error! Could not save note";
+                setTimeout(() => { document.getElementById("statusIndicator").classList.add("hidden"); }, 1000);
+                console.error("could not update note!");
+            }
+        });
+    }
+    else {
+        sendNoteData(0, maxPayload, json);
+    }
 }
 
 async function deleteNote(name) {
@@ -621,7 +627,6 @@ function autoSave() {
     var heading = document.getElementById("heading").value;
     var text = document.getElementById("editor").innerHTML;
     text = fixFormat(text);
-    console.log(text, text.hashCode());
     var cache_note = JSON.parse(sessionStorage.getItem("note-cache"));
     if (cache_note["name"] != heading || cache_note["data_hash"] != text.hashCode()) {
         var cache_json = JSON.stringify({
@@ -631,17 +636,84 @@ function autoSave() {
         });
         sessionStorage.setItem("note-cache", cache_json);
 
-        var json = JSON.stringify({
+        var json = {
             name_old: cache_note["name"],
             name: heading,
             data: text,
             path: cache_note["path"]
-        });
-        json = JSON.parse(json);
+        };
 
-        json["data"] = fixFormat(json["data"]);
         document.getElementById("editor").setContent(text);
         updateNote(deformatContent(json));
         getContentList(cache_note["path"]);
     }
+}
+
+function sendNoteData(pos, limit, json, end = false) {
+    if (end) {
+        fetch("http://localhost:3000/interface/", {
+
+            // Adding method type
+            method: "POST",
+
+            // Adding body or contents to send
+            body: JSON.stringify({
+                title: "update",
+                name_old: json["path"] + json["name_old"],
+                name: json["path"] + json["name"],
+                data: "",
+                isLastChunk: true
+            }),
+
+            // Adding headers to the request
+            headers: {
+                "Content-type": "application/json; charset=UTF-8"
+            }
+        }).then(res => {
+            if (res.status != 200) {
+                document.getElementById("statusIndicator").innerText = "Error! Could not save note";
+                setTimeout(() => { document.getElementById("statusIndicator").classList.add("hidden"); }, 1000);
+                console.error("could not update note!");
+            }
+            else {
+                document.getElementById("statusIndicator").innerText = "Saved";
+                setTimeout(() => { document.getElementById("statusIndicator").classList.add("hidden"); }, 1000);
+                console.log("updated note successfully");
+            }
+        });
+        return;
+    }
+
+    fetch("http://localhost:3000/interface/", {
+
+        // Adding method type
+        method: "POST",
+
+        // Adding body or contents to send
+        body: JSON.stringify({
+            title: "update",
+            name_old: json["path"] + json["name_old"],
+            name: json["path"] + json["name"],
+            data: json["data"].toByteArray().slice(pos, pos + limit).toString(),
+            isLastChunk: false
+        }),
+
+        // Adding headers to the request
+        headers: {
+            "Content-type": "application/json; charset=UTF-8"
+        }
+    }).then(res => {
+        if (res.status != 200) {
+            document.getElementById("statusIndicator").innerText = "Error! Could not save note";
+            setTimeout(() => { document.getElementById("statusIndicator").classList.add("hidden"); }, 1000);
+            console.error("could not update note!");
+            return;
+        }
+        if (pos + limit <= json["data"].toByteArray().length) {
+            sendNoteData(pos + limit, limit, json);
+        }
+        else {
+            sendNoteData(0, 0, json, true);
+        }
+    });
 }

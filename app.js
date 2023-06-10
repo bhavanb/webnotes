@@ -98,7 +98,7 @@ function readNote(res, name) {
     const src = fs.createReadStream(name);
     src.on("error", function (err) {
         console.error(err);
-        res.status(404);
+        res.status(404).send();
     });
     console.log("- Read", name);
     src.pipe(res);
@@ -107,7 +107,7 @@ function readNote(res, name) {
 function createNote(res, path, name) {
     fs.writeFile(path + name, "", (err) => {
         if (!err) {
-            console.log("- Created", path);
+            console.log("- Created", path + name);
             res.status(200).send();
         }
         else {
@@ -117,7 +117,14 @@ function createNote(res, path, name) {
     });
 }
 
+var buffer = "";
+
 function updateNote(res, data) {
+    if (!data["isLastChunk"]) {
+        buffer += data["data"];
+        res.status(200).send();
+        return;
+    }
     var oldpath = data["name_old"];
     fs.unlink(oldpath, function (err) {
         if (!err) {
@@ -128,7 +135,7 @@ function updateNote(res, data) {
         }
     });
     var path = data["name"];
-    fs.writeFile(path, data["data"], function (err) {
+    fs.writeFile(path, (buffer.length == 0) ? data["data"] : buffer, function (err) {
         if (!err) {
             console.log("- Updated as", path);
             res.status(200).send();
@@ -138,6 +145,7 @@ function updateNote(res, data) {
             res.status(500).send()
         }
     });
+    buffer = "";
 }
 
 function deleteNote(res, name) {
