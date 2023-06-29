@@ -34,20 +34,24 @@ async function confirm(text) {
 
 	popup.appendChild(confirmForm);
 
-	popup.addEventListener('cancel', (event) => {
+	popup.addEventListener("cancel", (event) => {
 		event.preventDefault();
 	});
 
 	document.body.appendChild(popup);
 
 	popup.showModal();
-	await new Promise(resolve => {
-		popup.addEventListener('close', () => {
-			resolve(true)
-		}, { once: true });
+	await new Promise((resolve) => {
+		popup.addEventListener(
+			"close",
+			() => {
+				resolve(true);
+			},
+			{ once: true }
+		);
 	});
 	popup.remove();
-	return (popup.returnValue === "accept") ? true : false;
+	return popup.returnValue === "accept" ? true : false;
 }
 
 async function prompt(text) {
@@ -69,7 +73,7 @@ async function prompt(text) {
 	promptInput.type = "text";
 	promptInput.classList.add(theme);
 	promptInput.autofocus = true;
-	promptFrom.appendChild(promptInput)
+	promptFrom.appendChild(promptInput);
 
 	var popupFooter = document.createElement("div");
 	popupFooter.id = "popup-confirm";
@@ -95,20 +99,24 @@ async function prompt(text) {
 	promptFrom.appendChild(popupFooter);
 	popup.appendChild(promptFrom);
 
-	popup.addEventListener('cancel', (event) => {
+	popup.addEventListener("cancel", (event) => {
 		event.preventDefault();
 	});
 
 	document.body.appendChild(popup);
 
 	popup.showModal();
-	await new Promise(resolve => {
-		popup.addEventListener('close', () => {
-			resolve(true)
-		}, { once: true });
+	await new Promise((resolve) => {
+		popup.addEventListener(
+			"close",
+			() => {
+				resolve(true);
+			},
+			{ once: true }
+		);
 	});
 	popup.remove();
-	return (popup.returnValue != "cancel") ? popup.returnValue : "";
+	return popup.returnValue != "cancel" ? popup.returnValue : "";
 }
 
 function replaceAll(string, search, replace) {
@@ -118,8 +126,9 @@ function replaceAll(string, search, replace) {
 function fixFormat(text) {
 	text = replaceAll(text, /<span .*?>/g, "");
 	text = replaceAll(text, /<\/span>/g, "");
+	text = replaceAll(text, "&nbsp;", "");
 
-	let parser = new DOMParser;
+	let parser = new DOMParser();
 	var elem = parser.parseFromString(text, "text/html").body;
 	var div = elem.querySelector("div");
 	while (div) {
@@ -140,49 +149,38 @@ function fixFormat(text) {
 }
 
 function formatContent(text) {
-	var text = text;
 
 	//BOLD
-	var rBSpan = /\*.*?\*/g;
-	var rBText = /(?<=\*)(.*?)(?=\*)/g;
-	var bSpan = rBSpan.exec(text);
-	var bText = rBText.exec(text);
+	var rBSpan = new RegExp(/\*.*?\*/, 'gs');
+	var bSpan = [...text.matchAll(rBSpan)];
 	if (bSpan) {
 		for (let i = 0; i < bSpan.length; i++) {
-			text = text.replace(bSpan[i], `<b>${bText[i]}</b>`);
+			text = text.replace(bSpan[i], `<b>${bSpan[i][0].substring(1, bSpan[i][0].length - 1)}</b>`);
 		}
 	}
 
 	//ITALIC
-	var rISpan = /_.*?_/g;
-	var rIText = /(?<=_)(.*?)(?=_)/g;
-	var iSpan = rISpan.exec(text);
-	var iText = rIText.exec(text);
+	var rISpan = new RegExp(/_.*?_/, 'gs');
+	var iSpan = [...text.matchAll(rISpan)];
 	if (iSpan) {
 		for (let i = 0; i < iSpan.length; i++) {
-			text = text.replace(iSpan[i], `<i>${iText[i]}</i>`);
+			text = text.replace(iSpan[i], `<i>${iSpan[i][0].substring(1, iSpan[i][0].length - 1)}</i>`);
 		}
-
 	}
 
 	//UNDERLINE
-	var rUSpan = /~.*?~/g;
-	var rUText = /(?<=~)(.*?)(?=~)/g;
-	var uSpan = rUSpan.exec(text);
-	var uText = rUText.exec(text);
+	var rUSpan = new RegExp(/~.*?~/, 'gs');
+	var uSpan = [...text.matchAll(rUSpan)];
 	if (uSpan) {
 		for (let i = 0; i < uSpan.length; i++) {
-			text = text.replace(uSpan[i], `<u>${uText[i]}</u>`);
+			text = text.replace(uSpan[i], `<u>${uSpan[i][0].substring(1, uSpan[i][0].length - 1)}</u>`);
 		}
 	}
 
-	text = replaceAll(text, "\n", "<br>");
-	text["data"] = text;
-	return text;
+	return replaceAll(text, "\n", "<br>");
 }
 
-function deformatContent(json) {
-	var text = json["data"];
+function deformatContent(text) {
 	//BOLD
 	text = replaceAll(text, /<b .*?>/g, "*");
 	text = replaceAll(text, /<\/b>/g, "*");
@@ -195,35 +193,36 @@ function deformatContent(json) {
 	//NEWLINE
 	text = replaceAll(text, /<br.*?>/g, "\n");
 
-	json["data"] = text.trim();
-	return json;
-
+	return text.trim();
 }
 
 function modifyUrl(title, url) {
-	if (typeof (history.pushState) != "undefined") {
+	if (typeof history.pushState != "undefined") {
 		var obj = {
 			Title: title,
-			Url: url
+			Url: url,
 		};
 		history.pushState(obj, obj.Title, obj.Url);
 	}
 }
 
-Uint8Array.prototype.toString = function () { return new TextDecoder().decode(this); }
-String.prototype.toByteArray = function () { return new TextEncoder().encode(this); }
+Uint8Array.prototype.toString = function () {
+	return new TextDecoder().decode(this);
+};
+String.prototype.toByteArray = function () {
+	return new TextEncoder().encode(this);
+};
 
 String.prototype.hashCode = function () {
-	var hash = 0,
-		i, chr;
+	var hash = 0, i, chr;
 	if (this.length === 0) return hash;
 	for (i = 0; i < this.length; i++) {
 		chr = this.charCodeAt(i);
-		hash = ((hash << 5) - hash) + chr;
+		hash = (hash << 5) - hash + chr;
 		hash |= 0;
 	}
 	return hash;
-}
+};
 
 HTMLDivElement.prototype.setContent = function (content) {
 	var range = window.getSelection().getRangeAt(0);
@@ -246,7 +245,7 @@ HTMLDivElement.prototype.setContent = function (content) {
 	}
 	this.innerHTML = content;
 	set_range(end, end, this);
-}
+};
 
 function get_text_nodes_in(node) {
 	var text_nodes = [];
@@ -266,11 +265,17 @@ function set_range(start, end, element) {
 	range.selectNodeContents(element);
 	var text_nodes = get_text_nodes_in(element);
 	var foundStart = false;
-	var char_count = 0, end_char_count;
+	var char_count = 0,
+		end_char_count;
 
-	for (var i = 0, text_node; text_node = text_nodes[i++];) {
+	for (var i = 0, text_node; (text_node = text_nodes[i++]);) {
 		end_char_count = char_count + text_node.length;
-		if (!foundStart && start >= char_count && (start < end_char_count || (start === end_char_count && i < text_nodes.length))) {
+		if (
+			!foundStart &&
+			start >= char_count &&
+			(start < end_char_count ||
+				(start === end_char_count && i < text_nodes.length))
+		) {
 			range.setStart(text_node, start - char_count);
 			foundStart = true;
 		}

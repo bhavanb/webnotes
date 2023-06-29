@@ -639,12 +639,12 @@ function autoSave() {
         var json = {
             name_old: cache_note["name"],
             name: heading,
-            data: text,
+            data: deformatContent(text),
             path: cache_note["path"]
         };
 
         document.getElementById("editor").setContent(text);
-        updateNote(deformatContent(json));
+        updateNote(json);
         getContentList(cache_note["path"]);
     }
 }

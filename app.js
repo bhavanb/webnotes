@@ -2,7 +2,6 @@
 const express = require('express');
 const fs = require('fs');
 const bodyParser = require('body-parser');
-require('dotenv').config();
 const app = express();
 const PORT = 3000;
 
@@ -73,6 +72,7 @@ function readListofContents(res, path = "") {
         if (!err) {
             let list = [];
             files.forEach((name) => {
+                if (name === ".gitignore") { return; }
                 var fpath = (readdir[readdir.length - 1] == '/') ? readdir + name : readdir + "/" + name;
                 list.push({
                     name: fpath,
@@ -125,16 +125,21 @@ function updateNote(res, data) {
         res.status(200).send();
         return;
     }
+
     var oldpath = data["name_old"];
-    fs.unlink(oldpath, function (err) {
-        if (!err) {
-            console.log("- Removed", oldpath);
-        }
-        else {
-            console.error(err);
-        }
-    });
     var path = data["name"];
+
+    if (oldpath != path) {
+        fs.unlink(oldpath, function (err) {
+            if (!err) {
+                console.log("- Removed", oldpath);
+            }
+            else {
+                console.error(err);
+            }
+        });
+    }
+
     fs.writeFile(path, (buffer.length == 0) ? data["data"] : buffer, function (err) {
         if (!err) {
             console.log("- Updated as", path);
