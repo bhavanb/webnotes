@@ -149,7 +149,7 @@ function sidebarIsOpen() {
     return document.getElementById("sidebar").style.width == "25%"
 }
 
-function getContentList(path = "") {
+function getContentList(folderId) {
     fetch("http://localhost:3000/interface/", {
 
         // Adding method type
@@ -159,7 +159,7 @@ function getContentList(path = "") {
         body: JSON.stringify({
             title: "request",
             type: "list",
-            path: path
+            folderId: folderId
         }),
 
         // Adding headers to the request
@@ -167,22 +167,18 @@ function getContentList(path = "") {
             "Content-type": "application/json; charset=UTF-8"
         }
     }).then(response => response.json()).then((json) => {
-        setContentList(json["path"], json["data"]);
+        setContentList(json["name"], json["parent"], json["data"], json["isHomeFolder"]);
         getSetTheme();
-        sessionStorage.setItem("path", (path) ? path : "./notes/");
+        sessionStorage.setItem("folderId", folderId || json["parent"].id);
     });
 }
 
-function setContentList(path, notes) {
+function setContentList(name, parent, notes, isHomeFolder) {
     var contentList = document.getElementById("contentList");
     contentList.querySelectorAll(".note").forEach((elem) => {
         elem.remove();
     });
-    if (path != "./notes/") {
-        var parentFolder = path;
-        split = parentFolder.split('/');
-        split = (split[split.length - 1] == '') ? split.slice(0, -1) : split;
-        parentFolder = parentFolder.replace(split[split.length - 1], "").replace(/\/+/g, "/");
+    if (!isHomeFolder) {
         var backButton = document.createElement("div");
 
         var backIcon = document.createElement("img");
@@ -192,20 +188,21 @@ function setContentList(path, notes) {
         backButton.appendChild(backIcon);
 
         var backText = document.createElement("p");
-        backText.innerText = "Back";
+        backText.innerText = name;
         backText.classList.add("inverse");
         backButton.appendChild(backText);
 
         var dirText = document.createElement("p");
-        dirText.innerText = parentFolder.replace("./notes", "home");
+        dirText.innerText = parent["name"].replace('WebNotes', 'Home');
         dirText.classList.add("inverse");
+        dirText.classList.add("dull");
         dirText.style.display = "none";
         dirText.setAttribute("text", "");
         backButton.appendChild(dirText);
 
         backButton.onclick = function () {
             if (!window.getSelection().toString()) {
-                getContentList(parentFolder);
+                getContentList(parent["id"]);
             }
         };
         backButton.classList = document.body.classList;
@@ -246,13 +243,12 @@ function setContentList(path, notes) {
     notes.forEach((elem) => {
         var entry = document.createElement("div");
 
-        var name = elem.name.split('/')[elem.name.split('/').length - 1];
-        name = (name.length <= 18) ? name : name.substring(0, 15) + "...";
+        var name = (elem.name.length <= 18) ? elem.name : elem.name.substring(0, 15) + "...";
 
         var theme = document.body.classList[0];
 
         var entryIcon = document.createElement("img");
-        entryIcon.src = `assets/icon-${elem.type}.svg`;
+        entryIcon.src = `assets/icon-${(elem.mimeType == "text/plain") ? "note" : "folder"}.svg`;
         entryIcon.setAttribute("draggable", "false");
         entryIcon.classList.add("icon");
         entryIcon.classList.add(theme);
@@ -272,7 +268,7 @@ function setContentList(path, notes) {
         deleteIcon.style.display = "none";
         deleteIcon.onclick = function (e) {
             e.stopPropagation();
-            (elem.type === 'note') ? deleteNote(elem.name) : deleteFolder(elem.name);
+            (elem.mimeType == "text/plain") ? deleteNote(elem.id, elem.name) : deleteFolder(elem.id, elem.name);
         };
         entry.appendChild(deleteIcon);
 
@@ -288,11 +284,11 @@ function setContentList(path, notes) {
 
         entry.onclick = function () {
             if (!window.getSelection().toString()) {
-                if (`${elem.type}` === "note") {
-                    getNote(`${elem.name}`);
+                if ((elem.mimeType == "text/plain")) {
+                    getNote(`${elem.id}`);
                 }
                 else {
-                    getFolder(`${elem.name}`);
+                    getContentList(`${elem.id}`);
                 }
             }
         };
@@ -365,8 +361,7 @@ function setOptionList() {
 async function createNote() {
     var name = await prompt("Enter name of new note:");
     if (!name) { return; }
-    var path = sessionStorage.getItem("path");
-    path += (path[path.length - 1] == '/') ? '' : '/';
+    var parentId = sessionStorage.getItem("folderId")
     fetch("http://localhost:3000/interface/", {
 
         // Adding method type
@@ -376,7 +371,7 @@ async function createNote() {
         body: JSON.stringify({
             title: "create",
             type: "note",
-            path: path,
+            parent: parentId,
             name: name
         }),
 
@@ -384,13 +379,13 @@ async function createNote() {
         headers: {
             "Content-type": "application/json; charset=UTF-8"
         }
-    }).then(res => {
-        if (res.status == 200) {
+    }).then(res => res.json()).then((json) => {
+        if (json.id) {
             document.getElementById("statusIndicator").innerText = "Created " + name;
             setTimeout(() => { document.getElementById("statusIndicator").classList.add("hidden"); }, 1000);
             console.log("created " + name + " successfully");
-            getNote(path + name);
-            getContentList(path);
+            getNote(json.id);
+            getContentList(parentId);
         }
         else {
             document.getElementById("statusIndicator").innerText = "Error! Could not create note";
@@ -400,7 +395,7 @@ async function createNote() {
     });
 }
 
-function getNote(note) {
+function getNote(fileId) {
     fetch("http://localhost:3000/interface/", {
 
         // Adding method type
@@ -410,37 +405,35 @@ function getNote(note) {
         body: JSON.stringify({
             title: "request",
             type: "note",
-            name: note
+            fileId: fileId
         }),
 
         // Adding headers to the request
         headers: {
             "Content-type": "application/json; charset=UTF-8"
         }
-    }).then(res => {
-        if (res.status == 200) {
-            res.text().then(text => {
-                openNote(note, formatContent(text));
-            });
+    }).then(res => res.json()).then((json) => {
+        if (json["metadata"]) {
+            openNote(json["metadata"].name, fileId, formatContent(json["data"]));
         }
         else {
-            document.getElementById("statusIndicator").innerText = "Error! Could not get " + note;
+            document.getElementById("statusIndicator").innerText = "Error! Could not get " + json["name"];
             setTimeout(() => { document.getElementById("statusIndicator").classList.add("hidden"); }, 1000);
-            console.error("Error! Could not get " + note);
+            console.error("Error! Could not get " + json["name"]);
         }
     });
 }
 
-function openNote(name, data) {
-    modifyUrl("Webnotes | " + name.split('/')[name.split('/').length - 1], "?note=" + name.replace("./", ""));
+function openNote(name, fileId, data) {
+    modifyUrl("Webnotes | " + name, "?note=" + fileId);
     sessionStorage.setItem("note-cache", JSON.stringify({
-        name: name.split('/')[name.split('/').length - 1],
+        name: name,
         data_hash: data.hashCode(),
-        path: name.replace(name.split('/')[name.split('/').length - 1], "")
+        fileId: fileId
     }));
     var heading = document.getElementById("heading");
     var editor = document.getElementById("editor");
-    heading.value = name.split('/')[name.split('/').length - 1];
+    heading.value = name;
     editor.innerHTML = data;
     if (document.getElementById("splashScreen")) {
         hideSplashscreen();
@@ -450,49 +443,43 @@ function openNote(name, data) {
 
 }
 
-function updateNote(json) {
-    var maxPayload = 65536;
+function updateNote(name, fileId, data) {
     document.getElementById("statusIndicator").classList.remove("hidden");
     document.getElementById("statusIndicator").innerText = "Saving...";
-    if (json["data"].toByteArray().length <= maxPayload) {
-        fetch("http://localhost:3000/interface/", {
+    fetch("http://localhost:3000/interface/", {
 
-            // Adding method type
-            method: "POST",
+        // Adding method type
+        method: "POST",
 
-            // Adding body or contents to send
-            body: JSON.stringify({
-                title: "update",
-                name_old: json["path"] + json["name_old"],
-                name: json["path"] + json["name"],
-                data: json["data"],
-                isLastChunk: true
-            }),
+        // Adding body or contents to send
+        body: JSON.stringify({
+            title: "update",
+            fileId: fileId,
+            name: name,
+            data: data
+        }),
 
-            // Adding headers to the request
-            headers: {
-                "Content-type": "application/json; charset=UTF-8"
-            }
-        }).then(res => {
-            if (res.status == 200) {
-                document.getElementById("statusIndicator").innerText = "Saved";
-                setTimeout(() => { document.getElementById("statusIndicator").classList.add("hidden"); }, 1000);
-                console.log("updated note successfully");
-            }
-            else {
-                document.getElementById("statusIndicator").innerText = "Error! Could not save note";
-                setTimeout(() => { document.getElementById("statusIndicator").classList.add("hidden"); }, 1000);
-                console.error("could not update note!");
-            }
-        });
-    }
-    else {
-        sendNoteData(0, maxPayload, json);
-    }
+        // Adding headers to the request
+        headers: {
+            "Content-type": "application/json; charset=UTF-8"
+        }
+    }).then(res => {
+        if (res.status == 200) {
+            document.getElementById("statusIndicator").innerText = "Saved";
+            setTimeout(() => { document.getElementById("statusIndicator").classList.add("hidden"); }, 1000);
+            console.log("updated note successfully");
+        }
+        else {
+            document.getElementById("statusIndicator").innerText = "Error! Could not save note";
+            setTimeout(() => { document.getElementById("statusIndicator").classList.add("hidden"); }, 1000);
+            console.error("could not update note!");
+        }
+    });
 }
 
-async function deleteNote(name) {
-    if (!await confirm("Are you sure you want to delete '" + name + "'? This cannot be undone!")) { return; }
+async function deleteNote(fileId, fileName) {
+    if (!await confirm("Are you sure you want to delete '" + fileName + "'? This cannot be undone!")) { return; }
+    modifyUrl("Webnotes", "");  //TODO:fix
     fetch("http://localhost:3000/interface/", {
 
         // Adding method type
@@ -502,7 +489,7 @@ async function deleteNote(name) {
         body: JSON.stringify({
             title: "delete",
             type: "note",
-            name: name
+            fileId: fileId
         }),
 
         // Adding headers to the request
@@ -523,14 +510,13 @@ async function deleteNote(name) {
         }
     });
 
-    getContentList(sessionStorage.getItem("path"));
+    getContentList(sessionStorage.getItem("folderId"));
 }
 
 async function createFolder() {
     var name = await prompt("Enter name of new folder:");
     if (!name) { return; }
-    var path = sessionStorage.getItem("path");
-    path += (path[path.length - 1] == '/') ? '' : '/';
+    var parentId = sessionStorage.getItem("folderId");
     fetch("http://localhost:3000/interface/", {
 
         // Adding method type
@@ -540,7 +526,7 @@ async function createFolder() {
         body: JSON.stringify({
             title: "create",
             type: "folder",
-            path: path,
+            parent: parentId,
             name: name
         }),
 
@@ -548,12 +534,12 @@ async function createFolder() {
         headers: {
             "Content-type": "application/json; charset=UTF-8"
         }
-    }).then(res => {
-        if (res.status == 200) {
+    }).then(res => res.json()).then((json) => {
+        if (json.id) {
             document.getElementById("statusIndicator").innerText = "Created folder";
             setTimeout(() => { document.getElementById("statusIndicator").classList.add("hidden"); }, 1000);
             console.log("created folder successfully");
-            getContentList(path + name);
+            getContentList(json.id);
         }
         else {
             document.getElementById("statusIndicator").innerText = "Error! Could not create folder";
@@ -563,13 +549,8 @@ async function createFolder() {
     });
 }
 
-function getFolder(path) {
-    getContentList(path);
-    sessionStorage.setItem("path", path);
-}
-
-async function deleteFolder(name) {
-    if (!await confirm("Are you sure you want to delete '" + name + "'? This cannot be undone! Notes inside '" + name + "' will also be deleted!")) { return; }
+async function deleteFolder(folderId, folderName) {
+    if (!await confirm("Are you sure you want to delete '" + folderName + "'? Notes inside '" + folderName + "' will also be deleted!")) { return; }
     fetch("http://localhost:3000/interface/", {
 
         // Adding method type
@@ -579,7 +560,7 @@ async function deleteFolder(name) {
         body: JSON.stringify({
             title: "delete",
             type: "folder",
-            name: name
+            folderId: folderId
         }),
 
         // Adding headers to the request
@@ -591,7 +572,7 @@ async function deleteFolder(name) {
             document.getElementById("statusIndicator").innerText = "Deleted folder";
             setTimeout(() => { document.getElementById("statusIndicator").classList.add("hidden"); }, 1000);
             console.log("deleted folder successfully");
-            getContentList(sessionStorage.getItem("path"));
+            getContentList(sessionStorage.getItem("folderId"));
             showSplashscreen();
         }
         else {
@@ -629,91 +610,12 @@ function autoSave() {
     text = fixFormat(text);
     var cache_note = JSON.parse(sessionStorage.getItem("note-cache"));
     if (cache_note["name"] != heading || cache_note["data_hash"] != text.hashCode()) {
-        var cache_json = JSON.stringify({
-            name: heading,
-            data_hash: text.hashCode(),
-            path: cache_note["path"]
-        });
-        sessionStorage.setItem("note-cache", cache_json);
-
-        var json = {
-            name_old: cache_note["name"],
-            name: heading,
-            data: deformatContent(text),
-            path: cache_note["path"]
-        };
+        cache_note["name"] = heading;
+        cache_note["data_hash"] = text.hashCode();
+        sessionStorage.setItem("note-cache", JSON.stringify(cache_note));
 
         document.getElementById("editor").setContent(text);
-        updateNote(json);
-        getContentList(cache_note["path"]);
+        updateNote(heading, cache_note["fileId"], deformatContent(text));
+        getContentList(sessionStorage.getItem("folderId"));
     }
-}
-
-function sendNoteData(pos, limit, json, end = false) {
-    if (end) {
-        fetch("http://localhost:3000/interface/", {
-
-            // Adding method type
-            method: "POST",
-
-            // Adding body or contents to send
-            body: JSON.stringify({
-                title: "update",
-                name_old: json["path"] + json["name_old"],
-                name: json["path"] + json["name"],
-                data: "",
-                isLastChunk: true
-            }),
-
-            // Adding headers to the request
-            headers: {
-                "Content-type": "application/json; charset=UTF-8"
-            }
-        }).then(res => {
-            if (res.status != 200) {
-                document.getElementById("statusIndicator").innerText = "Error! Could not save note";
-                setTimeout(() => { document.getElementById("statusIndicator").classList.add("hidden"); }, 1000);
-                console.error("could not update note!");
-            }
-            else {
-                document.getElementById("statusIndicator").innerText = "Saved";
-                setTimeout(() => { document.getElementById("statusIndicator").classList.add("hidden"); }, 1000);
-                console.log("updated note successfully");
-            }
-        });
-        return;
-    }
-
-    fetch("http://localhost:3000/interface/", {
-
-        // Adding method type
-        method: "POST",
-
-        // Adding body or contents to send
-        body: JSON.stringify({
-            title: "update",
-            name_old: json["path"] + json["name_old"],
-            name: json["path"] + json["name"],
-            data: json["data"].toByteArray().slice(pos, pos + limit).toString(),
-            isLastChunk: false
-        }),
-
-        // Adding headers to the request
-        headers: {
-            "Content-type": "application/json; charset=UTF-8"
-        }
-    }).then(res => {
-        if (res.status != 200) {
-            document.getElementById("statusIndicator").innerText = "Error! Could not save note";
-            setTimeout(() => { document.getElementById("statusIndicator").classList.add("hidden"); }, 1000);
-            console.error("could not update note!");
-            return;
-        }
-        if (pos + limit <= json["data"].toByteArray().length) {
-            sendNoteData(pos + limit, limit, json);
-        }
-        else {
-            sendNoteData(0, 0, json, true);
-        }
-    });
 }

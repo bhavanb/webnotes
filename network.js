@@ -69,7 +69,7 @@ async function authorize() {
  * @param {drive_v3.Drive} drive 
  * @returns file ID of the WebNotes folder
 */
-async function getFolderId(drive) {
+async function getFolderId() {
     const res = await drive.files.list({
         q: 'mimeType=\'application/vnd.google-apps.folder\' and name = \'WebNotes\' and trashed=false',
         fields: 'files(id)',
@@ -102,7 +102,7 @@ async function getFolderId(drive) {
  * @param {String} folderName The name of the file to be created
  * @returns The file ID the created file
  */
-async function createFolder(drive, parentId, folderName) {
+exports.createFolder = async function (parentId, folderName) {
     const fileMetadata = {
         name: folderName,
         mimeType: 'application/vnd.google-apps.folder',
@@ -121,11 +121,10 @@ async function createFolder(drive, parentId, folderName) {
 }
 
 /**
- * 
  * @param {*} drive A drive object
  * @param {*} folderId The file ID of the folder to be deleted
 */
-async function deleteFolder(drive, folderId) {
+exports.deleteFolder = async function (folderId) {
     try {
         await drive.files.update({
             fileId: folderId,
@@ -140,11 +139,10 @@ async function deleteFolder(drive, folderId) {
 }
 
 /**
- * 
  * @param {*} drive A drive object
  * @param {*} folderId The file ID of the folder to be recovered
 */
-async function recoverFolder(drive, folderId) {
+exports.recoverFolder = async function (folderId) {
     try {
         await drive.files.update({
             fileId: folderId,
@@ -163,13 +161,26 @@ async function recoverFolder(drive, folderId) {
  * @param {String} folderId The folder to search for files in
  * @returns An array of files and their ids in the specified folder
  */
-async function listFiles(drive, folderId) {
+exports.getFiles = async function (folderId = exports.homeFolderId) {
     try {
         const res = await drive.files.list({
             q: '\'' + folderId + '\' in parents and trashed=false',
-            fields: 'nextPageToken, files(id, name)',
+            fields: 'nextPageToken, files(id, name, mimeType)',
         });
         return res.data.files;
+    } catch (err) {
+        // TODO(developer) - Handle error
+        throw err;
+    }
+}
+
+exports.getFileMetadata = async function (fileId) {
+    try {
+        const res = await drive.files.get({
+            fileId: fileId,
+            fields: "name, parents"
+        });
+        return res.data;
     } catch (err) {
         // TODO(developer) - Handle error
         throw err;
@@ -183,19 +194,15 @@ async function listFiles(drive, folderId) {
  * @param {String} fileContent The contents of the file to be created
  * @returns The file ID the created file
  */
-async function createFile(drive, folderId, fileName, fileContent) {
+exports.createFile = async function (folderId, fileName) {
     var fileMetadata = {
         name: fileName,
-        parents: [folderId]
-    };
-    var data = {
-        mimeType: 'text/plain',
-        body: fileContent
+        parents: [folderId],
+        mimeType: 'text/plain'
     };
     try {
         const res = await drive.files.create({
             resource: fileMetadata,
-            media: data,
             fields: 'id'
         });
         return res.data.id;
@@ -210,13 +217,16 @@ async function createFile(drive, folderId, fileName, fileContent) {
  * @param {drive_v3.Drive} drive A drive object
  * @param {String} fileId The file to fetch the contents from
  */
-async function getFile(drive, fileId) {
+exports.getFile = async function (fileId) {
     try {
         const res = await drive.files.get({
             fileId: fileId,
             alt: 'media',
         });
-        return res.data;
+        return {
+            metadata: await exports.getFileMetadata(fileId),
+            data: res.data
+        };
     } catch (err) {
         // TODO(developer) - Handle error
         throw err;
@@ -229,7 +239,7 @@ async function getFile(drive, fileId) {
  * @param {*} fileId The file ID of the file to be updated
  * @param {*} fileContent The updated contents of the file
  */
-async function updateFile(drive, fileId, fileContent) {
+exports.updateFile = async function (fileId, fileName, fileContent) {
     var data = {
         mimeType: 'text/plain',
         body: fileContent
@@ -237,7 +247,8 @@ async function updateFile(drive, fileId, fileContent) {
     try {
         await drive.files.update({
             fileId: fileId,
-            media: data,
+            resource: { name: fileName },
+            media: data
         });
     } catch (err) {
         // TODO(developer) - Handle error
@@ -251,7 +262,7 @@ async function updateFile(drive, fileId, fileContent) {
  * @param {String} fileId The file ID of the file to be moved
  * @param {String} newFolderId The file ID of the folder that the file is to be moved to
  */
-async function moveFile(drive, fileId, newFolderId) {
+exports.moveFile = async function (fileId, newFolderId) {
     try {
         await drive.files.update({
             fileId: fileId,
@@ -270,7 +281,7 @@ async function moveFile(drive, fileId, newFolderId) {
  * @param {*} drive A drive object
  * @param {*} fileId The file ID of the file to be deleted
  */
-async function deleteFile(drive, fileId) {
+exports.deleteFile = async function (fileId) {
     try {
         await drive.files.update({
             fileId: fileId,
@@ -289,7 +300,7 @@ async function deleteFile(drive, fileId) {
  * @param {*} drive A drive object
  * @param {*} fileId The file ID of the file to be recovered
  */
-async function recoverFile(drive, fileId) {
+exports.recoverFile = async function (fileId) {
     try {
         await drive.files.update({
             fileId: fileId,
@@ -302,35 +313,10 @@ async function recoverFile(drive, fileId) {
         throw err;
     }
 }
-
-async function main() {
+var drive;
+exports.homeFolderId;
+exports.setup = async function () {
     const authClient = await authorize();
-    const drive = google.drive({ version: 'v3', auth: authClient });
-
-    const folderId = await getFolderId(drive);
-    console.log("gfId:", folderId);
-
-    const fileId = await createFile(drive, folderId, "Test Note 1", "Hello World! This is a test note.");
-    console.log("cfId:", fileId);
-
-    let files = await listFiles(drive, folderId);
-    console.log("fs:", files);
-
-    var content = await getFile(drive, fileId);
-    console.log("f:", content);
-
-    await updateFile(drive, fileId, "Hello! This is the updated Test Note.");
-
-    content = await getFile(drive, fileId);
-    console.log("f:", content);
-
-    await deleteFile(drive, fileId);
-
-    // await recoverFile(drive, fileId);
-
-    // const subfolderId = await createFolder(drive, folderId, "Test Folder 1");
-    // await createFile(drive, subfolderId, "Test Note 2", "This is a test note within a subfolder!");
-    // await deleteFolder(drive, subfolderId);
+    drive = google.drive({ version: 'v3', auth: authClient });
+    exports.homeFolderId = await getFolderId();
 }
-
-main();

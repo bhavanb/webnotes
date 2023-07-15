@@ -2,6 +2,8 @@
 const express = require('express');
 const fs = require('fs');
 const bodyParser = require('body-parser');
+const network = require('./network')
+
 const app = express();
 const PORT = 3000;
 
@@ -10,9 +12,10 @@ app.use(bodyParser.urlencoded({ extended: false }));
 
 app.use(express.static("public"));
 
-app.listen(PORT, (error) => {
+app.listen(PORT, async function (error) {
     if (!error) {
         console.log("Server is Successfully Running, and App is listening on port " + PORT);
+        await network.setup();
     }
     else {
         console.log("Error occurred, server can't start", error);
@@ -24,13 +27,14 @@ app.post('/interface/', (req, res) => {
 
     switch (data["title"]) {
         case "request":
-            console.log('Received request: ' + data["type"]);
 
             if (data["type"] === "list") {
-                readListofContents(res, data["path"]);
+                console.log('Received request: ' + (data["folderId"] || network.homeFolderId));
+                readListofContents(res, data["folderId"]);
             }
             else if (data["type"] == "note") {
-                readNote(res, data["name"]);
+                console.log('Received request: ' + data["fileId"]);
+                readNote(res, data["fileId"]);
             }
             break;
 
@@ -38,25 +42,26 @@ app.post('/interface/', (req, res) => {
             console.log('Received create: ' + data["name"]);
 
             if (data["type"] === "note") {
-                createNote(res, data["path"], data["name"]);
+                createNote(res, data["parent"], data["name"]);
             }
             else if (data["type"] == "folder") {
-                createFolder(res, data["path"], data["name"]);
+                createFolder(res, data["parent"], data["name"]);
             }
             break;
 
         case "update":
-            console.log('Received update: ' + data["name_old"]);
-            updateNote(res, data);
+            console.log('Received update: ' + data["name"]);
+            updateNote(res, data["fileId"], data["name"], data["data"]);
             break;
 
         case "delete":
-            console.log('Received delete: ' + data["name"]);
             if (data["type"] === "note") {
-                deleteNote(res, data["name"]);
+                console.log('Received delete: ' + data["fileId"]);
+                deleteNote(res, data["fileId"]);
             }
             else if (data["type"] == "folder") {
-                deleteFolder(res, data["name"]);
+                console.log('Received delete: ' + data["folderId"]);
+                deleteFolder(res, data["folderId"]);
             }
             break;
 
@@ -65,137 +70,70 @@ app.post('/interface/', (req, res) => {
     }
 });
 
-function readListofContents(res, path = "") {
-    var readdir = path || "./notes/";
-    readdir = readdir.replace(/\/+/g, "/");
-    fs.readdir(readdir, (err, files) => {
-        if (!err) {
-            let list = [];
-            files.forEach((name) => {
-                if (name === ".gitignore") { return; }
-                var fpath = (readdir[readdir.length - 1] == '/') ? readdir + name : readdir + "/" + name;
-                list.push({
-                    name: fpath,
-                    type: (fs.lstatSync(fpath).isFile()) ? "note" : "folder"
-                });
-            });
-
-            list = list.filter(item => item.type === "folder").concat(list.filter(item => item.type === "note"));
-            console.log("- Read", list);
-            res.send(JSON.stringify({
-                data: list,
-                path: readdir
-            }));
-        }
-        else {
-            console.error(err);
-            res.status(500).send();
-        }
-    });
+async function readListofContents(res, folderId = network.homeFolderId) {
+    var data = await network.getFileMetadata(folderId);
+    var parentData = await network.getFileMetadata(data.parents[0]);
+    res.send(JSON.stringify({
+        name: data.name,
+        data: await network.getFiles(folderId),
+        parent: (folderId == network.homeFolderId) ? { id: network.homeFolderId, name: 'WebNotes' } : { id: data.parents[0], name: parentData.name },
+        isHomeFolder: (folderId == network.homeFolderId)
+    }));
 }
 
-function readNote(res, name) {
-    const src = fs.createReadStream(name);
-    src.on("error", function (err) {
+async function readNote(res, fileId) {
+    var data = await network.getFile(fileId);
+    res.send(JSON.stringify(data));
+}
+
+async function createNote(res, folderId, name) {
+    try {
+        res.send(JSON.stringify({
+            id: await network.createFile(folderId, name)
+        }));
+    } catch (err) {
         console.error(err);
-        res.status(404).send();
-    });
-    console.log("- Read", name);
-    src.pipe(res);
+        res.status(500).send();
+    }
 }
 
-function createNote(res, path, name) {
-    fs.writeFile(path + name, "", (err) => {
-        if (!err) {
-            console.log("- Created", path + name);
-            res.status(200).send();
-        }
-        else {
-            console.error(err);
-            res.status(500).send();
-        }
-    });
-}
-
-var buffer = "";
-
-function updateNote(res, data) {
-    if (!data["isLastChunk"]) {
-        buffer += data["data"];
+async function updateNote(res, fileId, name, data) {
+    try {
+        await network.updateFile(fileId, name, data);
         res.status(200).send();
-        return;
+    } catch (err) {
+        console.error(err);
+        res.status(500).send();
     }
+}
 
-    var oldpath = data["name_old"];
-    var path = data["name"];
-
-    if (oldpath != path) {
-        fs.unlink(oldpath, function (err) {
-            if (!err) {
-                console.log("- Removed", oldpath);
-            }
-            else {
-                console.error(err);
-            }
-        });
+async function deleteNote(res, fileId) {
+    try {
+        await network.deleteFile(fileId);
+        res.status(200).send();
+    } catch (err) {
+        console.error(err);
+        res.status(500).send();
     }
-
-    fs.writeFile(path, (buffer.length == 0) ? data["data"] : buffer, function (err) {
-        if (!err) {
-            console.log("- Updated as", path);
-            res.status(200).send();
-        }
-        else {
-            console.error(err);
-            res.status(500).send()
-        }
-    });
-    buffer = "";
 }
 
-function deleteNote(res, name) {
-    fs.unlink(name, function (err) {
-        if (!err) {
-            console.log("- Deleted", name);
-            res.status(200).send();
-        }
-        else {
-            console.error(err);
-            res.status(500).send();
-        }
-    });
+async function createFolder(res, folderId, name) {
+    try {
+        res.send(JSON.stringify({
+            id: await network.createFolder(folderId, name)
+        }));
+    } catch (err) {
+        console.error(err);
+        res.status(500).send();
+    }
 }
 
-function createFolder(res, path, name) {
-    fs.mkdir(path + name, (err) => {
-        if (!err) {
-            console.log("- Created Folder", path);
-            res.send(JSON.stringify({
-                data: "success"
-            }));
-        }
-        else {
-            console.error(err);
-            res.send(JSON.stringify({
-                data: "error"
-            }));
-        }
-    });
-}
-
-function deleteFolder(res, name) {
-    fs.rm(name, { recursive: true, force: true }, function (err) {
-        if (!err) {
-            console.log("- Deleted", name);
-            res.send(JSON.stringify({
-                data: "success"
-            }));
-        }
-        else {
-            console.error(err);
-            res.send(JSON.stringify({
-                data: "error"
-            }));
-        }
-    });
+async function deleteFolder(res, folderId) {
+    try {
+        await network.deleteFile(folderId);
+        res.status(200).send();
+    } catch (err) {
+        console.error(err);
+        res.status(500).send();
+    }
 }
