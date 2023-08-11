@@ -166,11 +166,39 @@ function getContentList(folderId) {
         headers: {
             "Content-type": "application/json; charset=UTF-8"
         }
-    }).then(response => response.json()).then((json) => {
-        setContentList(json["name"], json["parent"], json["data"], json["isHomeFolder"]);
+    }).then(response => response.json()).then(async (json) => {
+        if (!json["error"]) {
+            setContentList(json["name"], json["parent"], json["data"], json["isHomeFolder"]);
+            sessionStorage.setItem("folderId", folderId || json["parent"].id);
+        }
+        else {
+            console.log(json);
+            setNoAuthContentList();
+        }
         getSetTheme();
-        sessionStorage.setItem("folderId", folderId || json["parent"].id);
     });
+}
+
+function setNoAuthContentList() {
+    console.log("not signed in");
+    var contentList = document.getElementById("contentList");
+    contentList.querySelectorAll(".note").forEach((elem) => {
+        elem.remove();
+    });
+    var empty = document.createElement("div");
+    var emptyText = document.createElement("p");
+    emptyText.innerText = "Sign in to access your notes.";
+    emptyText.classList.add("inverse");
+    emptyText.style.opacity = "0.75";
+    empty.appendChild(emptyText);
+
+    empty.classList = document.body.classList;
+    empty.classList.add("note", "inverse");
+    if (!sidebarIsOpen()) {
+        empty.classList.add("hidden");
+    }
+
+    contentList.appendChild(empty);
 }
 
 function setContentList(name, parent, notes, isHomeFolder) {
@@ -356,6 +384,45 @@ function setOptionList() {
     }
 
     optionList.appendChild(newNote);
+
+    var signInButton = document.createElement("div");
+
+    var signInButtonIcon = document.createElement("img");
+    signInButtonIcon.src = "assets/google-logo.svg"
+    signInButtonIcon.setAttribute("draggable", "false");
+    signInButtonIcon.classList.add("icon");
+    signInButton.appendChild(signInButtonIcon);
+
+    var signInButtonText = document.createElement("p");
+    signInButtonText.innerText = "Sign in";
+    signInButtonText.classList.add("inverse");
+    signInButton.appendChild(signInButtonText);
+
+    signInButton.onclick = function () {
+        fetch("http://localhost:3000/interface/", {
+
+            // Adding method type
+            method: "POST",
+
+            // Adding body or contents to send
+            body: JSON.stringify({
+                title: "login"
+            }),
+            // Adding headers to the request
+            headers: {
+                "Content-type": "application/json; charset=UTF-8"
+            }
+        }).then(res => res.json()).then((json) => {
+            window.location.href = json.url;
+        });
+    };
+    signInButton.classList = document.body.classList;
+    signInButton.classList.add("option", "inverse");
+    if (!sidebarIsOpen) {
+        signInButton.classList.add("hidden");
+    }
+
+    optionList.appendChild(signInButton);
 }
 
 async function createNote() {

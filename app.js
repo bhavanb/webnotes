@@ -1,31 +1,44 @@
 
 const express = require('express');
-const fs = require('fs');
 const bodyParser = require('body-parser');
 const network = require('./network')
-
+const cors = require('cors');
 const app = express();
 const PORT = 3000;
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
-
+app.use(cors());
 app.use(express.static("public"));
 
 app.listen(PORT, async function (error) {
     if (!error) {
         console.log("Server is Successfully Running, and App is listening on port " + PORT);
-        await network.setup();
+        // await network.setup();
     }
     else {
         console.log("Error occurred, server can't start", error);
     }
 });
 
+// app.get('/authentication', network.authorize);
+app.get('/oauth2callback', network.handleOAuthCallback);
+
 app.post('/interface/', (req, res) => {
     let data = req.body;
 
+    if (!(network.isRunning) && data["title"] != "login") {
+        // console.log("sending to auth");
+        // network.authorize(req, res);
+        res.send(JSON.stringify({ error: "Not Signed in" }))
+        return;
+    }
+
     switch (data["title"]) {
+        case "login":
+            console.log("login");
+            network.authorize(req, res);
+            break;
         case "request":
 
             if (data["type"] === "list") {
