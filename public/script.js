@@ -1,4 +1,12 @@
+var token = "";
+
 window.onload = async function () {
+    const urlParams = new URLSearchParams(window.location.search);
+    token = urlParams.get("token");
+    if (token != null) {
+        console.log(token);
+        window.history.pushState({}, document.title, '/');
+    }
     setOptionList();
     getContentList();
 
@@ -13,7 +21,6 @@ window.onload = async function () {
         editor.scrollTop = editor.scrollHeight;
     }
 
-    const urlParams = new URLSearchParams(window.location.search);
     const note = urlParams.get('note');
     if (note != null) {
         getNote(note);
@@ -55,12 +62,7 @@ function wordCount() {
             }
         });
     });
-    if (count == 1) {
-        document.getElementById("wordcount").innerHTML = count + " word";
-    }
-    else {
-        document.getElementById("wordcount").innerHTML = count + " words";
-    }
+    document.getElementById("wordcount").innerHTML = count + " word" + ((count==1)?"":"s");
 }
 
 function updateTitle() {
@@ -394,7 +396,7 @@ function setOptionList() {
     signInButton.appendChild(signInButtonIcon);
 
     var signInButtonText = document.createElement("p");
-    signInButtonText.innerText = "Sign in";
+    signInButtonText.innerText = (token == null) ? "Sign in" : "Sign out";
     signInButtonText.classList.add("inverse");
     signInButton.appendChild(signInButtonText);
 
@@ -406,14 +408,17 @@ function setOptionList() {
 
             // Adding body or contents to send
             body: JSON.stringify({
-                title: "login"
+                title: (token == null) ? "login" : "logout"
             }),
             // Adding headers to the request
             headers: {
                 "Content-type": "application/json; charset=UTF-8"
             }
         }).then(res => res.json()).then((json) => {
-            window.location.href = json.url;
+            if (token == null)
+                window.location.href = json.url;
+            else if(json.logout)
+                window.location.reload();
         });
     };
     signInButton.classList = document.body.classList;

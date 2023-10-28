@@ -2,7 +2,7 @@ const { google, drive_v3 } = require('googleapis');
 const credentials = require('./credentials.json').web;
 
 // If modifying these scopes, delete token.json.
-const SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.resource'];
+const SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly https://www.googleapis.com/auth/drive.file'];
 
 const oauth2Client = new google.auth.OAuth2(credentials.client_id, credentials.client_secret, "http://localhost:3000/oauth2callback");
 
@@ -22,8 +22,48 @@ exports.handleOAuthCallback = async function (req, res) {
     let { tokens } = await oauth2Client.getToken(req.query.code);
     oauth2Client.setCredentials(tokens);
     setup(oauth2Client).then(() => {
-        res.redirect('/');
+        // res.redirect('/');
+        //send repsonse to client indicating that the user has been signed in sign in=> sign out. send access token too for log out? might be security concern
+        res.redirect('/?token=' + oauth2Client.credentials.access_token);
     });
+}
+
+exports.logout = async function (req, res) {
+    const https = require('https');
+
+    // Build the string for the POST request
+    let postData = "token=" + oauth2Client.credentials.access_token;
+
+    // Options for POST request to Google's OAuth 2.0 server to revoke a token
+    let postOptions = {
+        host: 'oauth2.googleapis.com',
+        port: '443',
+        path: '/revoke',
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Content-Length': Buffer.byteLength(postData)
+        }
+    };
+
+    // Set up the request
+    const postReq = https.request(postOptions, function (res) {
+        res.setEncoding('utf8');
+        res.on('data', d => {
+            console.log('Response: ' + d);
+        });
+    });
+    
+    postReq.on('error', error => {
+        console.log(error)
+    });
+    
+    // Post the request with data
+    postReq.write(postData);
+    postReq.end();
+    console.log("logged out");
+    res.send(JSON.stringify({ logout: true }));
+    exports.isRunning = false;
 }
 
 var drive;

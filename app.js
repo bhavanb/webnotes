@@ -39,6 +39,10 @@ app.post('/interface/', (req, res) => {
             console.log("login");
             network.authorize(req, res);
             break;
+        case "logout":
+            console.log("logout");
+            network.logout(req, res);
+            break;
         case "request":
 
             if (data["type"] === "list") {

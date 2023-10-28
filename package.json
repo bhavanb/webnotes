@@ -4,7 +4,8 @@
   "description": "Note taking and basic word processing for the web.",
   "main": "app.js",
   "scripts": {
-    "dev": "nodemon app.js --verbose"
+    "main": "nodemon app.js --verbose",
+    "dev": "nodemon server.js --verbose"
   },
   "author": "",
   "license": "ISC",
