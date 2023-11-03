@@ -1,11 +1,15 @@
-var token = "";
+var UUID = "";
 
 window.onload = async function () {
+
     const urlParams = new URLSearchParams(window.location.search);
-    token = urlParams.get("token");
-    if (token != null) {
-        console.log(token);
+    UUID = urlParams.get("uuid");
+    if (UUID != null) {
+        console.log(UUID);
         window.history.pushState({}, document.title, '/');
+    }
+    else {
+        await attemptSessionRestore();
     }
     setOptionList();
     getContentList();
@@ -26,6 +30,35 @@ window.onload = async function () {
         getNote(note);
     }
     await document.fonts.load("16px Inter").then(function () { hideLoader() }, function () { console.log("error loading fonts"); });
+}
+
+async function attemptSessionRestore() {
+    console.log("attempt session restore");
+    await fetch("http://localhost:3000/interface/", {
+
+        // Adding method type
+        method: "POST",
+
+        // Adding body or contents to send
+        body: JSON.stringify({
+            uuid: null,
+            title: "restore"
+        }),
+
+        // Adding headers to the request
+        headers: {
+            "Content-type": "application/json; charset=UTF-8"
+        }
+    }).then(response => response.json()).then((json) => {
+        console.log("json: "+JSON.stringify(json));
+        if (json["uuid"] != "error") {
+            UUID = json["uuid"];
+            console.log("restored session!");
+            console.log(UUID);
+        }
+        else
+            console.log("failed to restore session");
+    });
 }
 
 var autosaveTimeout;
@@ -62,7 +95,7 @@ function wordCount() {
             }
         });
     });
-    document.getElementById("wordcount").innerHTML = count + " word" + ((count==1)?"":"s");
+    document.getElementById("wordcount").innerHTML = count + " word" + ((count == 1) ? "" : "s");
 }
 
 function updateTitle() {
@@ -152,6 +185,7 @@ function sidebarIsOpen() {
 }
 
 function getContentList(folderId) {
+    console.log(UUID);
     fetch("http://localhost:3000/interface/", {
 
         // Adding method type
@@ -159,6 +193,7 @@ function getContentList(folderId) {
 
         // Adding body or contents to send
         body: JSON.stringify({
+            uuid: UUID,
             title: "request",
             type: "list",
             folderId: folderId
@@ -396,7 +431,7 @@ function setOptionList() {
     signInButton.appendChild(signInButtonIcon);
 
     var signInButtonText = document.createElement("p");
-    signInButtonText.innerText = (token == null) ? "Sign in" : "Sign out";
+    signInButtonText.innerText = (UUID == null) ? "Sign in" : "Sign out";
     signInButtonText.classList.add("inverse");
     signInButton.appendChild(signInButtonText);
 
@@ -408,17 +443,15 @@ function setOptionList() {
 
             // Adding body or contents to send
             body: JSON.stringify({
-                title: (token == null) ? "login" : "logout"
+                uuid: UUID,
+                title: (UUID == null) ? "login" : "logout"
             }),
             // Adding headers to the request
             headers: {
                 "Content-type": "application/json; charset=UTF-8"
             }
         }).then(res => res.json()).then((json) => {
-            if (token == null)
-                window.location.href = json.url;
-            else if(json.logout)
-                window.location.reload();
+            window.location.href = json.url;
         });
     };
     signInButton.classList = document.body.classList;
@@ -441,6 +474,7 @@ async function createNote() {
 
         // Adding body or contents to send
         body: JSON.stringify({
+            uuid: UUID,
             title: "create",
             type: "note",
             parent: parentId,
@@ -475,6 +509,7 @@ function getNote(fileId) {
 
         // Adding body or contents to send
         body: JSON.stringify({
+            uuid: UUID,
             title: "request",
             type: "note",
             fileId: fileId
@@ -525,6 +560,7 @@ function updateNote(name, fileId, data) {
 
         // Adding body or contents to send
         body: JSON.stringify({
+            uuid: UUID,
             title: "update",
             fileId: fileId,
             name: name,
@@ -559,6 +595,7 @@ async function deleteNote(fileId, fileName) {
 
         // Adding body or contents to send
         body: JSON.stringify({
+            uuid: UUID,
             title: "delete",
             type: "note",
             fileId: fileId
@@ -596,6 +633,7 @@ async function createFolder() {
 
         // Adding body or contents to send
         body: JSON.stringify({
+            uuid: UUID,
             title: "create",
             type: "folder",
             parent: parentId,
@@ -630,6 +668,7 @@ async function deleteFolder(folderId, folderName) {
 
         // Adding body or contents to send
         body: JSON.stringify({
+            uuid: UUID,
             title: "delete",
             type: "folder",
             folderId: folderId
