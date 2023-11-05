@@ -1,16 +1,17 @@
-var UUID = "";
-
+var UUID = null;
+const serverURL = "http://localhost:3000/interface/"
 window.onload = async function () {
-
     const urlParams = new URLSearchParams(window.location.search);
-    UUID = urlParams.get("uuid");
-    if (UUID != null) {
-        console.log(UUID);
-        window.history.pushState({}, document.title, '/');
+    await attemptSessionRestore();
+    if (UUID == null) {
+        var code = urlParams.get("code");
+        console.log("code: " + code);
+        if (code != null) {
+            await sendAuthCode(code);
+            window.history.pushState({}, document.title, '/');
+        }
     }
-    else {
-        await attemptSessionRestore();
-    }
+
     setOptionList();
     getContentList();
 
@@ -32,9 +33,9 @@ window.onload = async function () {
     await document.fonts.load("16px Inter").then(function () { hideLoader() }, function () { console.log("error loading fonts"); });
 }
 
-async function attemptSessionRestore() {
-    console.log("attempt session restore");
-    await fetch("http://localhost:3000/interface/", {
+async function sendAuthCode(code) {
+    console.log("sending authcode");
+    await fetch(serverURL, {
 
         // Adding method type
         method: "POST",
@@ -42,7 +43,8 @@ async function attemptSessionRestore() {
         // Adding body or contents to send
         body: JSON.stringify({
             uuid: null,
-            title: "restore"
+            title: "code",
+            code: code
         }),
 
         // Adding headers to the request
@@ -50,15 +52,48 @@ async function attemptSessionRestore() {
             "Content-type": "application/json; charset=UTF-8"
         }
     }).then(response => response.json()).then((json) => {
-        console.log("json: "+JSON.stringify(json));
-        if (json["uuid"] != "error") {
-            UUID = json["uuid"];
-            console.log("restored session!");
-            console.log(UUID);
-        }
-        else
-            console.log("failed to restore session");
+        console.log(json);
+        UUID = json["uuid"];
+        document.cookie = "sessionData=" + JSON.stringify({ uuid: UUID, authTime: Date.now() }) + "; maxAge=" + (12 * 60 * 60 * 1000);
     });
+}
+
+
+async function attemptSessionRestore() {
+    console.log("attempt session restore");
+    try {
+        var sessionData = JSON.parse(document.cookie.split("; ").find((row) => row.startsWith("sessionData="))?.split("=")[1]);
+        console.log(sessionData);
+        await fetch(serverURL, {
+
+            // Adding method type
+            method: "POST",
+
+            // Adding body or contents to send
+            body: JSON.stringify({
+                uuid: null,
+                title: "restore",
+                authTime: sessionData.authTime
+            }),
+
+            // Adding headers to the request
+            headers: {
+                "Content-type": "application/json; charset=UTF-8"
+            }
+        }).then(response => response.json()).then((json) => {
+            console.log("json: " + JSON.stringify(json));
+            if (json["uuid"] == "valid") {
+                UUID = sessionData.uuid;
+                console.log("restored session!");
+                console.log(UUID);
+            }
+            else
+                console.log("failed to restore session");
+        });
+    } catch (error) {
+        console.log("failed to restore session");
+    }
+
 }
 
 var autosaveTimeout;
@@ -186,7 +221,7 @@ function sidebarIsOpen() {
 
 function getContentList(folderId) {
     console.log(UUID);
-    fetch("http://localhost:3000/interface/", {
+    fetch(serverURL, {
 
         // Adding method type
         method: "POST",
@@ -436,7 +471,7 @@ function setOptionList() {
     signInButton.appendChild(signInButtonText);
 
     signInButton.onclick = function () {
-        fetch("http://localhost:3000/interface/", {
+        fetch(serverURL, {
 
             // Adding method type
             method: "POST",
@@ -451,6 +486,8 @@ function setOptionList() {
                 "Content-type": "application/json; charset=UTF-8"
             }
         }).then(res => res.json()).then((json) => {
+            if (UUID != null)
+                document.cookie = "sessionData=;";
             window.location.href = json.url;
         });
     };
@@ -467,7 +504,7 @@ async function createNote() {
     var name = await prompt("Enter name of new note:");
     if (!name) { return; }
     var parentId = sessionStorage.getItem("folderId")
-    fetch("http://localhost:3000/interface/", {
+    fetch(serverURL, {
 
         // Adding method type
         method: "POST",
@@ -502,7 +539,7 @@ async function createNote() {
 }
 
 function getNote(fileId) {
-    fetch("http://localhost:3000/interface/", {
+    fetch(serverURL, {
 
         // Adding method type
         method: "POST",
@@ -553,7 +590,7 @@ function openNote(name, fileId, data) {
 function updateNote(name, fileId, data) {
     document.getElementById("statusIndicator").classList.remove("hidden");
     document.getElementById("statusIndicator").innerText = "Saving...";
-    fetch("http://localhost:3000/interface/", {
+    fetch(serverURL, {
 
         // Adding method type
         method: "POST",
@@ -588,7 +625,7 @@ function updateNote(name, fileId, data) {
 async function deleteNote(fileId, fileName) {
     if (!await confirm("Are you sure you want to delete '" + fileName + "'? This cannot be undone!")) { return; }
     modifyUrl("Webnotes", "");  //TODO:fix
-    fetch("http://localhost:3000/interface/", {
+    fetch(serverURL, {
 
         // Adding method type
         method: "POST",
@@ -626,7 +663,7 @@ async function createFolder() {
     var name = await prompt("Enter name of new folder:");
     if (!name) { return; }
     var parentId = sessionStorage.getItem("folderId");
-    fetch("http://localhost:3000/interface/", {
+    fetch(serverURL, {
 
         // Adding method type
         method: "POST",
@@ -661,7 +698,7 @@ async function createFolder() {
 
 async function deleteFolder(folderId, folderName) {
     if (!await confirm("Are you sure you want to delete '" + folderName + "'? Notes inside '" + folderName + "' will also be deleted!")) { return; }
-    fetch("http://localhost:3000/interface/", {
+    fetch(serverURL, {
 
         // Adding method type
         method: "POST",

@@ -1,10 +1,10 @@
 const { google } = require('googleapis');
-const credentials = require('./credentials.json').web;
-
+const credentials = require('./credentials_isolated.json').web;
+const clientURL = "http://localhost:5000"
 module.exports = class DriveManager {
     async setup(code) {
         console.log("New DriveManager!");
-        this.authClient = new google.auth.OAuth2(credentials.client_id, credentials.client_secret, "http://localhost:3000/oauth2callback");
+        this.authClient = new google.auth.OAuth2(credentials.client_id, credentials.client_secret, clientURL);
         var { tokens } = await this.authClient.getToken(code)
         this.authClient.setCredentials(tokens);
         this.drive = google.drive({ version: 'v3', auth: this.authClient });

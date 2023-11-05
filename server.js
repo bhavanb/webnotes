@@ -10,57 +10,56 @@ const { google } = require('googleapis');
 const uuid = require('uuid').v4;
 const https = require('https');
 const DriveManager = require('./driveManager');
-const credentials = require('./credentials.json').web;
+const credentials = require('./credentials_isolated.json').web;
+
+const clientURL = "http://localhost:5500";
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cors());
 app.use(cookieParser());
-app.use(express.static("public"));
+// app.use(express.static("public"));
 
-const oauth2Client = new google.auth.OAuth2(credentials.client_id, credentials.client_secret, "http://localhost:3000/oauth2callback");
+const oauth2Client = new google.auth.OAuth2(credentials.client_id, credentials.client_secret, clientURL);
 var driveManagers = new Map();
 const serverStartTime = Date.now()
 app.listen(PORT, async function (error) {
     if (!error) {
         console.log("Server is Successfully Running, and App is listening on port " + PORT);
-        // await driveManagers.get(uuid).setup();
     }
     else {
         console.log("Error occurred, server can't start", error);
     }
 });
 
-app.get('/oauth2callback', async (req, res) => {
-    console.log(req.query.code);
-    var uId = uuid();
-    driveManagers.set(uId, new DriveManager());
-    await driveManagers.get(uId).setup(req.query.code);
-    console.log(uId);
-    res.cookie("sessionData", JSON.stringify({ uuid: uId, startTime: Date.now() }), { maxAge: 12 * 60 * 60 * 1000 });
-    res.redirect('/?uuid=' + uId);
-});
 
-app.post('/interface/', (req, res) => {
+app.post('/interface/', async (req, res) => {
     let data = req.body;
     console.log(data);
     // console.log(data["title"]);
-    if ((data["title"] != "login" && data["title"] != "restore") && data["uuid"] == null) {
+    if (!(data["title"] == "login" || data["title"] == "restore" || data["title"] == "code") && data["uuid"] == null) {
         res.send(JSON.stringify({ error: "Not Signed in" }))
         return;
     }
 
     switch (data["title"]) {
+        case "code":
+            console.log(data["code"]);
+            var uId = uuid();
+            driveManagers.set(uId, new DriveManager());
+            await driveManagers.get(uId).setup(data["code"]);
+            console.log(uId);
+            res.send(JSON.stringify({ uuid: uId }));
+            break;
+
         case "restore":
             console.log("attempt session restore");
-            if (req.cookies.sessionData) {
-                if (JSON.parse(req.cookies.sessionData).startTime < serverStartTime)
-                    authorize(req, res);
-                else
-                    res.send(JSON.stringify({ uuid: JSON.parse(req.cookies.sessionData).uuid }));
-            }
+            console.log("authTime: " + data["authTime"]);
+            console.log("startTime: " + serverStartTime);
+            if (data["authTime"] < serverStartTime)
+                authorize(req, res);
             else
-                res.send(JSON.stringify({uuid: "error"}));
+                res.send(JSON.stringify({ uuid: "valid" }));
             console.log(req.cookies);
             return;
         case "login":
@@ -173,7 +172,7 @@ async function logout(uuid, req, res) {
     postReq.end();
     console.log("logout " + uuid);
     res.clearCookie("uuid");
-    res.send(JSON.stringify({ url: "http://localhost:3000/" }));
+    res.send(JSON.stringify({ url: clientURL }));
     driveManagers.delete(uuid);
 }
 
