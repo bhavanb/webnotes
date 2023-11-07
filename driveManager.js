@@ -1,6 +1,6 @@
 const { google } = require('googleapis');
-const credentials = require('./credentials_isolated.json').web;
-const clientURL = "http://localhost:5000"
+const credentials = require('./credentials.json').web;
+const clientURL = "http://localhost:5500"
 module.exports = class DriveManager {
     async setup(code) {
         console.log("New DriveManager!");

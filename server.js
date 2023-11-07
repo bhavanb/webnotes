@@ -10,7 +10,7 @@ const { google } = require('googleapis');
 const uuid = require('uuid').v4;
 const https = require('https');
 const DriveManager = require('./driveManager');
-const credentials = require('./credentials_isolated.json').web;
+const credentials = require('./credentials.json').web;
 
 const clientURL = "http://localhost:5500";
 
