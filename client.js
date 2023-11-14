@@ -1,5 +1,5 @@
 var UUID = null;
-const serverURL = "http://localhost:3000/interface/"
+const serverURL = "http://152.67.175.180:3000/interface/"
 window.onload = async function () {
     const urlParams = new URLSearchParams(window.location.search);
     await attemptSessionRestore();
