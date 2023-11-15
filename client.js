@@ -8,7 +8,7 @@ window.onload = async function () {
         console.log("code: " + code);
         if (code != null) {
             await sendAuthCode(code);
-            window.history.pushState({}, document.title, '/');
+            window.history.pushState({}, document.title, document.location.href);
         }
     }
 
