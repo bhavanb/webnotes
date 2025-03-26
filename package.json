@@ -1,10 +1,10 @@
 {
-  "name": "notes",
+  "name": "webnotes",
   "version": "1.0.0",
   "description": "Note taking and basic word processing for the web.",
   "main": "app.js",
   "scripts": {
-    "main": "nodemon app.js --verbose",
+    "main": "nodemon server.js --verbose",
     "dev": "nodemon server.js --verbose"
   },
   "author": "",
